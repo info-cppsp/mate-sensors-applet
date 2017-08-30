@@ -1,3 +1,39 @@
+I <info@cppsp.de> added a plugin for udisks2 to this project.
+It seems to work, but consider it an alpha version.
+I need help with testing.
+
+I have installed the following packages on mint 18.2 64 bit:
+build-essential
+yelp-tools
+libglib2.0-dev
+libgtk-3-dev
+libmate-panel-applet-dev
+for udisks:
+libatasmart-dev
+libdbus-glib-1-dev
+
+install with usual
+./autogen.sh --prefix=/usr
+make
+sudo make install
+
+Please note that mint may place the resulting executable to a different place
+not where it would lauch after adding the applet to a mate-panel.
+So I have looked at system monitor, mate-sensor-applet, right click, properties, Command Line
+then made link from /usr/libexec/mate-sensors-applet to /usr/local/libexec/mate-sensors-applet
+-> can test w/o restart
+
+For debug I have used syslog, bc I am not familiar with glib or gdebug or dbus (obviously).
+This plugin has been made with trial and lots of error, so help, useful input is appreciated.
+
+I would like to note one major point:
+The udisks plugin and the new udisks2 plugin asks DBus for the HDD temperature every refresh time seconds.
+The default is 2s. However the smart data is updated every 10 mins.
+There is a function to force this data update, but I don't think it is necessary.
+
+
+
+
 MATE Sensors Applet <https://github.com/mate-desktop/mate-sensors-applet>
 
 Authors: Alex Murray <murray.alex@gmail.com>,
