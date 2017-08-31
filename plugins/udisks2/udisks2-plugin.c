@@ -442,13 +442,10 @@ syslog(LOG_ERR, "Added %s", id);
 			}
 			else
 			{
-				g_debug ("Cannot obtain data for device: %s\n"
-					 "Error: %s\n",
-					 key,
-					 error->message);
-				g_error_free (error);
-				error = NULL;
-				//g_object_unref(sensor_proxy);
+#ifdef UD2PD
+syslog(LOG_ERR, "No temp data for device: %s\n", key);
+#endif
+				g_debug ("No temp data for device: %s\n", key);
 			}
 
 #ifdef UD2PD
