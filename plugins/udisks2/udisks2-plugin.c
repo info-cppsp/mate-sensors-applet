@@ -19,6 +19,11 @@
  */
 
 /*
+Udisks2 plugin for the mate-sensors-applet
+
+written by info@cppsp.de using the structure and code of the previous version
+from above author
+
 fd1 - from doc1 - dbus-glib documentation
 https://dbus.freedesktop.org/doc/dbus-glib/
 fd2 - from doc2 - GDBUS documentation
@@ -32,18 +37,11 @@ syslog(LOG_ERR, "hellodd");
 
 
 
-
-
-
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif /* HAVE_CONFIG_H */
 
 #include <stdio.h>
-#include <atasmart.h>
-//#include <glib.h>
-//#include <dbus/dbus-glib.h>
 #include <gio/gio.h>
 #include "udisks2-plugin.h"
 
@@ -76,8 +74,10 @@ typedef struct _DevInfo{
 	GError *error;
 } DevInfo;
 
+
 const gchar *plugin_name = "udisks2";
 
+// a container for the devices found to have smart enabled
 GHashTable *devices = NULL;
 
 /* This is a global variable for convenience */
@@ -86,17 +86,11 @@ GDBusConnection *connection;
 
 static void update_device(DevInfo *info)
 {
-//	GDBusProxy *sensor_proxy;
-//	GValue smart_time = { 0, };
-//	SkDisk *sk_disk;
-//	GValue smart_blob_val = { 0, };
-//	GArray *smart_blob;
-//	guint64 temperature;
-
 	GError *error = NULL;
 	GVariant *tempgvar;
 	gdouble temp;
 
+	// check valid input parameter
 	g_return_if_fail(info != NULL);
 
 	// check connection too
@@ -105,8 +99,10 @@ static void update_device(DevInfo *info)
 	g_clear_error(&info->error);
 
 // for the udisks plugin a new sensor_proxy was created here, which seems stupid, as one is already stored in the DevInfo struct
+// I only create one direct connect proxy here in this function
 
 	// check for sensor_proxy, which should exist at this point, make one if necessary and save it into DevInfo
+	// this is used to get the temp value the direct way
 	if(NULL == info->sensor_proxy)
 	{
 		info->sensor_proxy = g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, NULL,
@@ -170,6 +166,7 @@ static void update_device(DevInfo *info)
 	}
 */
 
+	// directly asking the device's DBus object for the temp
 	tempgvar = g_dbus_proxy_call_sync(info->sensor_proxy, "Get",
 				g_variant_new ("(ss)",
 					UDISKS2_DEVICE_INTERFACE2_NAME,
@@ -181,6 +178,7 @@ static void update_device(DevInfo *info)
 
 	if (NULL == tempgvar)
 	{
+
 #ifdef UD2PD
 syslog(LOG_ERR, "Failed to get drive temperature");
 #endif
@@ -193,26 +191,31 @@ syslog(LOG_ERR, "Failed to get drive temperature");
 	}
 	else
 	{
+
 #ifdef UD2PD
-syslog(LOG_ERR, "value type: %s", g_variant_print(g_variant_get_variant(g_variant_get_child_value(tempgvar, 0)), TRUE));
+syslog(LOG_ERR, "tempgvar value: %s", g_variant_print(g_variant_get_variant(g_variant_get_child_value(tempgvar, 0)), TRUE));
 #endif
+
+		// tempgvar comes back as sg along the lines of array(gvariant(tempasdouble))
+		// hence unpacking
 		temp = g_variant_get_double(g_variant_get_variant(g_variant_get_child_value(tempgvar, 0)));
+		// temp in K
 		info->temp = temp - 273.15;
 		g_variant_unref(tempgvar);
+
 #ifdef UD2PD
 syslog(LOG_ERR, "Refresh udisks2 device temp: '%f'\n", info->temp);
 #endif
+
 	}
 
-
-//	g_free(sk_disk);
-//	g_array_free(smart_blob, TRUE);
-//	g_object_unref(sensor_proxy);
 
 }
 
 
+
 /* This is the handler for the Changed() signal emitted by UDisks. */
+/*
 static void udisks2_changed_signal_cb(GDBusProxy *sensor_proxy) {
 	const gchar *path;
 	DevInfo *info;
@@ -224,21 +227,22 @@ static void udisks2_changed_signal_cb(GDBusProxy *sensor_proxy) {
 
 //	update_device(info);
 }
+*/
+
 
 // in this function we would like to get a list of device (hdd/ssd) paths
 // then with each path we get the temperature
-// it is possible with udisks2 to get all the above infrmation in one g_dbus_proxy_call_sync(), so that is how I did it
+// it is possible with udisks2 to get all the above information in one g_dbus_proxy_call_sync(), so that is how I did it
 // a better version would be to use GDBusObjectManager Server + Client ??
 static void udisks2_plugin_get_sensors(GList **sensors) {
+
 #ifdef UD2PD
 syslog(LOG_ERR, "fstart");
 #endif
 
-
-	GDBusProxy *proxy, *sensor_proxy;
+	GDBusProxy *proxy;
 	GError *error = NULL;
-	GPtrArray *paths;
-//	guint i;
+
 	DevInfo *info;
 
 	/* This connection will be used for everything, including the obtaining
@@ -249,20 +253,25 @@ syslog(LOG_ERR, "fstart");
 	connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
 	if (connection == NULL)
 	{
+
 #ifdef UD2PD
 syslog(LOG_ERR, "dbus conn fail");
 #endif
+
 		g_debug("Failed to open connection to DBUS: %s",
-							error->message);
+			error->message);
 		g_error_free(error);
 		return;
 	}
+
 #ifdef UD2PD
 syslog(LOG_ERR, "dbus conn success");
 #endif
-	/* This is the proxy which is only used once during the enumeration of
+
+	/* This was the proxy which is only used once during the enumeration of
 	 * the device object paths
 	 */
+	// I use it to get all info of all devices at once
 	// fd1: Creates a new proxy for a remote interface exported by a connection on a message bus.
 	// fd2: Creates a proxy for accessing interface_name on the remote object at object_path owned by name at connection and synchronously loads D-Bus properties unless the G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES flag is used.
 	proxy = g_dbus_proxy_new_sync(connection, G_DBUS_PROXY_FLAGS_NONE, NULL,
@@ -275,6 +284,7 @@ syslog(LOG_ERR, "dbus conn success");
 #ifdef UD2PD
 syslog(LOG_ERR, "dbus conn proxy success");
 #endif
+
 	/* The object paths of the disks are enumerated and placed in an array
 	 * of object paths
 	 */
@@ -297,9 +307,11 @@ syslog(LOG_ERR, "dbus conn proxy success");
 
 	if (NULL == managed_objects)
 	{
+
 #ifdef UD2PD
 syslog(LOG_ERR, "Failed to enumerate disk devices");
 #endif
+
 		g_debug("Failed to enumerate disk devices: %s",
 			   error->message);
 		g_error_free(error);
@@ -308,12 +320,12 @@ syslog(LOG_ERR, "Failed to enumerate disk devices");
 		connection = NULL;
 		return;
 	}
-//syslog(LOG_ERR, "managed_objects type: %s", g_variant_print(managed_objects, TRUE));
-	// the result dictionary is enclosed in an array
+
+	// the result dictionary is enclosed in an array, unpack
 	managed_objects = g_variant_get_child_value(managed_objects, 0);
 
-//syslog(LOG_ERR, "managed_objects type: %s", g_variant_print(managed_objects, TRUE));
 #ifdef UD2PD
+//syslog(LOG_ERR, "managed_objects type: %s", g_variant_print(managed_objects, TRUE));
 syslog(LOG_ERR, "success to enumerate disk devices");
 #endif
 
@@ -325,14 +337,13 @@ syslog(LOG_ERR, "success to enumerate disk devices");
 	gchar *key;	     // object path (like '/org/freedesktop/UDisks2/drives/Samsung_SSD_840_EVO_250GB_*insert drive serial nr.*')
 	GVariant *value;
 
-	//g_variant_iter_init(&iter, managed_objects);
 #ifdef UD2PD
+// log collection size
 syslog(LOG_ERR, "iter init count: %d", (int) g_variant_iter_init(&iter, managed_objects));
 #else
-g_variant_iter_init(&iter, managed_objects);
+	g_variant_iter_init(&iter, managed_objects);
 #endif
 
-//syslog(LOG_ERR, "after iter init");
 	// "{sv}"  is a GVariant format string
 	// {} dictionary of, s string, v GVariant
 	// changed to "{oa{sa{sv}}}" on error message 'the GVariant format string '{sv}' has a type of '{sv}' but the given value has a type of 'a{oa{sa{sv}}}''
@@ -345,7 +356,7 @@ g_variant_iter_init(&iter, managed_objects);
 
 #ifdef UD2PD
 syslog(LOG_ERR, "in iter while loop");
-syslog(LOG_ERR, "key type: %s", key);
+syslog(LOG_ERR, "key value: %s", key);
 //syslog(LOG_ERR, "value type: %s", g_variant_print(value, TRUE));
 #endif
 
@@ -358,7 +369,7 @@ syslog(LOG_ERR, "key type: %s", key);
 		GVariant *propdict;		// drive data
 		GVariant *propdict2;	// drive smart data
 
-		// make two dictionaries that contains the properties of the drive interfaces
+		// make two dictionaries that contain the properties of the drive interfaces
 		propdict = g_variant_lookup_value(value, UDISKS2_DEVICE_INTERFACE_NAME, G_VARIANT_TYPE_DICTIONARY);
 		propdict2 = g_variant_lookup_value(value, UDISKS2_DEVICE_INTERFACE2_NAME, G_VARIANT_TYPE_DICTIONARY);
 
@@ -366,11 +377,11 @@ syslog(LOG_ERR, "key type: %s", key);
 		// do we have the right ifname keys?
 		if((NULL != propdict) && (NULL != propdict2))
 		{
+
 #ifdef UD2PD
 syslog(LOG_ERR, "propdict type: %s", g_variant_print(propdict, TRUE));
 syslog(LOG_ERR, "propdict2 type: %s", g_variant_print(propdict2, TRUE));
 #endif
-
 
 			// get data
 			gchar *id;
@@ -380,6 +391,7 @@ syslog(LOG_ERR, "propdict2 type: %s", g_variant_print(propdict2, TRUE));
 			gdouble temp;
 
 			// NULL, bc we don't care about the length of the string
+			// typecast bc g_variant_get_string() returns const char*
 			id = (gchar *) g_variant_get_string(g_variant_lookup_value(propdict, "Id", G_VARIANT_TYPE_STRING), NULL);
 			model = (gchar *) g_variant_get_string(g_variant_lookup_value(propdict, "Model", G_VARIANT_TYPE_STRING), NULL);
 
@@ -405,12 +417,12 @@ syslog(LOG_ERR, "Found udisks2 device temp: '%f'\n", temp);
 					devices = g_hash_table_new(g_str_hash,
 								   g_str_equal);
 				}
+
 				info->id =  g_strdup(id);
 				info->path =  g_strdup(key);
-				//info->sensor_proxy = sensor_proxy;
 
-				//info->temp = 0.0;
 				// temp in K
+				// this could be left at 0.0, 2 seconds later it will be refreshed anyway
 				info->temp = (gdouble)temp - 273.15;
 				g_hash_table_insert(devices, info->id, info);
 
@@ -425,68 +437,52 @@ syslog(LOG_ERR, "Found udisks2 device temp: '%f'\n", temp);
 								 DEFAULT_GRAPH_COLOR);
 
 				g_debug("Added %s", id);
-				//g_debug("Added %s %s", path, id);
+
 #ifdef UD2PD
 syslog(LOG_ERR, "Added %s", id);
 #endif
 
-
-
-
-
-
-
-
-
-
 			}
 			else
 			{
+
 #ifdef UD2PD
 syslog(LOG_ERR, "No temp data for device: %s\n", key);
 #endif
+
 				g_debug ("No temp data for device: %s\n", key);
 			}
 
 #ifdef UD2PD
 syslog(LOG_ERR, "b4 free1");
 #endif
-			g_free((void *) id);
-			g_free((void *) model);
 
-
+			g_free(id);
+			g_free(model);
 
 		}
 
 #ifdef UD2PD
 syslog(LOG_ERR, "b4 free2");
 #endif
-// free propdict, propdict2
-// g_variant_dict_unref() may not work a few times, gives error
-// this one seems to do fine
-if(NULL != propdict) {g_variant_unref(propdict);}
-if(NULL != propdict2) {g_variant_unref(propdict2);}
+
+		// free propdict, propdict2
+		// g_variant_dict_unref() may not work a few times, gives error
+		// this one seems to do fine
+		if(NULL != propdict) {g_variant_unref(propdict);}
+		if(NULL != propdict2) {g_variant_unref(propdict2);}
 
 #ifdef UD2PD
 syslog(LOG_ERR, "b4 free3");
 #endif
-		// must free data for ourselves
+
 		g_free(key);
 		g_variant_unref(value);
 
-	}
-
-
-
-
-
-
-
-
+	}       // end of while loop
 
 
 	g_variant_unref(managed_objects);
-	//g_ptr_array_free(paths, TRUE);
 	g_object_unref(proxy);
 	if (devices == NULL)
 	{
@@ -495,12 +491,15 @@ syslog(LOG_ERR, "b4 free3");
 	}
 }
 
+
+// this is the function called every refresh cycle
 static gdouble udisks2_plugin_get_sensor_value(const gchar *path,
 					      const gchar *id,
 					      SensorType type,
 					      GError **error) {
 	DevInfo *info;
 
+	// get device stuct from data store
 	info = (DevInfo *)g_hash_table_lookup(devices, path);
 	if (info == NULL)
 	{
@@ -515,10 +514,19 @@ static gdouble udisks2_plugin_get_sensor_value(const gchar *path,
 		info->error = NULL;
 		return 0.0;
 	}
+
+	// refresh device temp
 	/* update value since Changed() signal doesn't fire manually enough so
 	 * poll instead */
 	update_device(info);
 	return info->temp;
+}
+
+
+// API functions
+const gchar *sensors_applet_plugin_name(void)
+{
+	return plugin_name;
 }
 
 static GList *udisks2_plugin_init(void) {
@@ -527,11 +535,6 @@ static GList *udisks2_plugin_init(void) {
 	udisks2_plugin_get_sensors(&sensors);
 
 	return sensors;
-}
-
-const gchar *sensors_applet_plugin_name(void)
-{
-	return plugin_name;
 }
 
 GList *sensors_applet_plugin_init(void)

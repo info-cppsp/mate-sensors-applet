@@ -24,12 +24,37 @@ then made link from /usr/libexec/mate-sensors-applet to /usr/local/libexec/mate-
 -> can test w/o restart
 
 For debug I have used syslog, bc I am not familiar with glib or gdebug or dbus (obviously).
-This plugin has been made with trial and lots of error, so help, useful input is appreciated.
+You can use this by removing // from the line //#define UD2PD              1
+and then looking at /var/log/syslog.
+
+Another useful tool for DBus is d-feet. It is a GUI, where you can send messages to d-bus services.
+Alternatively you can use:
+dbus-send --system --print-reply --dest=org.freedesktop.UDisks2 "/org/freedesktop/UDisks2" org.freedesktop.DBus.ObjectManager.GetManagedObjects > test.txt
+Params: bus name, object path, interface name + message, params to message
+This particular command gets all the info from the UDisk2 service.
+It is very useful to see the structure of the returned data.
+In the plugin I iterate over this to find drive info and temp.
 
 I would like to note one major point:
 The udisks plugin and the new udisks2 plugin asks DBus for the HDD temperature every refresh time seconds.
 The default is 2s. However the smart data is updated every 10 mins.
 There is a function to force this data update, but I don't think it is necessary.
+
+I would also note that polling DBus every 2 seconds sound like a waste of computing power. ;-)
+
+Before, the non solution for this non problem was to use a 'changed' signal from DBus as well to update the temp.
+I better say that as of now it is unclear to me why or whether or not it is a priority to display a temp change 
+right after it has happened and not within max. 10 seconds.
+Therefore I haven't rewritten that part of the code.
+
+The plugin is pretty simple.
+In the 1st part it searches for devices with smart enabled.
+Then on request / refresh of the main program it gets the temperature of each - in the program selected - device.
+
+I have used tons of comments to make my code understandable.
+I hope they will be of use.
+
+This plugin has been made with trial and lots of error, so please help, useful input is appreciated.
 
 
 
