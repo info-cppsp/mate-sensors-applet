@@ -10,7 +10,6 @@ AM_CPPFLAGS = -DMATELOCALEDIR=\""$(datadir)/locale/"\" \
         -DPREFIX=\""$(prefix)"\" \
 	-I$(top_srcdir) \
 	$(GLIB_CFLAGS)
-	$(LIBATASMART_CFLAGS)
 
 
 
@@ -20,6 +19,6 @@ libudisks2_la_SOURCES = \
 	udisks2-plugin.h	\
 	udisks2-plugin.c
 
-libudisks2_la_LDFLAGS = $(PLUGIN_LIBTOOL_FLAGS) $(GLIB_LIBS)	$(LIBATASMART_LIBS)
+libudisks2_la_LDFLAGS = $(PLUGIN_LIBTOOL_FLAGS) $(GLIB_LIBS)
 
 libudisks2_la_LIBADD = $(top_builddir)/lib/libmate-sensors-applet-plugin.la

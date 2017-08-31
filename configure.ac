@@ -101,19 +101,20 @@ AC_ARG_ENABLE(udisks2,
 
 if test "x$enable_udisks2" = "xno" ; then
 	echo "Disabling udisks2 support"
-else
+#else
 #	PKG_CHECK_MODULES(DBUSGLIB, dbus-glib-1 >= $LIBDBUSGLIB_REQUIRED,
 #		          HAVE_DBUSGLIB="yes", HAVE_DBUSGLIB="no")
 #	AC_SUBST(DBUSGLIB_CFLAGS)
 #	AC_SUBST(DBUSGLIB_LIBS)
 
-	PKG_CHECK_MODULES(LIBATASMART, libatasmart >= $LIBATASMART_REQUIRED,
-			  HAVE_LIBATASMART="yes", HAVE_LIBATASMART="no")
-	AC_SUBST(LIBATASMART_CFLAGS)
-	AC_SUBST(LIBATASMART_LIBS)
+#	PKG_CHECK_MODULES(LIBATASMART, libatasmart >= $LIBATASMART_REQUIRED,
+#			  HAVE_LIBATASMART="yes", HAVE_LIBATASMART="no")
+#	AC_SUBST(LIBATASMART_CFLAGS)
+#	AC_SUBST(LIBATASMART_LIBS)
 fi
 
-AM_CONDITIONAL(UDISKS2, test -n "$LIBATASMART_LIBS")
+# use same test as above, bc AM_CONDITIONAL may not be in if/else
+AM_CONDITIONAL(UDISKS2, test "x$enable_udisks2" = "xyes")
 
 # support for libnotify
 LIBNOTIFY_CFLAGS=
